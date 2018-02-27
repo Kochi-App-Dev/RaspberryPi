@@ -1,0 +1,15 @@
+#!/bin/bash -eu
+
+readonly MESSAGE=$@
+readonly DIC=/usr/local/share/open_jtalk/dic-1.09
+readonly VOICE=/usr/local/share/hts_voice/mei_normal.htsvoice
+readonly PITCH=0.8
+readonly GAIN=3.0
+
+if [ -z "$MESSAGE" ]
+then
+        echo "usage: $(basename `readlink -f $0`) MESSAGE" >&2
+        exit 1
+fi
+
+echo $MESSAGE | open_jtalk -x $DIC -m $VOICE -r $PITCH -ow /dev/stdout | aplay --quiet
