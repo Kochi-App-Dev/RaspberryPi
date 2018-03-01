@@ -5,6 +5,7 @@ import subprocess
 from subprocess import Popen
 import datetime
 import argparse
+import subprocess
 
 ####### 定数 #######
 GPIO_SW_1 = 6
@@ -12,9 +13,9 @@ GPIO_SW_2 = 13
 GPIO_SW_3 = 19
 GPIO_SW_BLUE = 26
 
-GPIO_LED_1 = 7
+GPIO_LED_1 = 25
 GPIO_LED_2 = 8
-GPIO_LED_3 = 25
+GPIO_LED_3 = 7
 
 GPIO_LED_TOWER_RED = 16
 GPIO_LED_TOWER_YELLOW = 20
@@ -29,7 +30,7 @@ def readEventData():
 	global eventList
 	eventList = fp.readlines()
 	fp.close()
-#	print (eventList)
+	#print (eventList)
 
 def eventBeforeDays(days, sound):
 	data = getIndexByFuture(days)
@@ -38,18 +39,29 @@ def eventBeforeDays(days, sound):
 		return 0
 	startMP3(sound)
 	say = data[1] + data[2]
-	print ("say:" + say)
+	#print ("say:" + say)
 	startSayProcess(say)
 	return 1
 	
 def startSayProcess(say):
 	cmd = "./say " + say
-	proc = Popen( cmd,shell=True )
-	print( "process id = %s" % proc.pid )
+	#proc = Popen( cmd,shell=True )
+	proc = subprocess.call(cmd, shell=True )
+	#print( "process id = %s" % proc.pid )
 	
+
+def startTalkProcess():
+    cmd = "python3 /home/pi/nakayama/aquestalkpi/zatudann.py"
+    #proc = Popen( cmd,shell=True )
+    proc = subprocess.call(cmd, shell=True )
+    #print( "process id = %s" % proc.pid )
+    
+
+
 def startMP3(file):
 	cmd = "aplay " + file
 	proc = Popen( cmd,shell=True )
+	#proc = subprocess.call(cmd, shell=True)
 	print( "process id = %s" % proc.pid )
 
 	
@@ -100,12 +112,13 @@ useSample = parser.parse_args().use_sample
 
 readEventData()
 
+
 if useSample == "on":
 	startMP3('music/01.wav')
 	iC0 = GPIO_SW_3
 	eventBeforeDays(-1, 'onepoint/3.wav')
 	time.sleep(5.01)
-	
+
 try:
 	if useGPIO == "on":
 		print "starting GPIO"
@@ -121,50 +134,72 @@ try:
 		GPIO.setup(GPIO_LED_TOWER_RED, GPIO.OUT)
 		GPIO.setup(GPIO_LED_TOWER_YELLOW, GPIO.OUT)
 		GPIO.setup(GPIO_LED_TOWER_GREEN, GPIO.OUT)
-		
-		
-		GPIO.output(GPIO_LED_TOWER_GREEN, 1)		# status ok
+
+		GPIO.output(GPIO_LED_1, 0)      # 1 week led off
+		GPIO.output(GPIO_LED_2, 0)      # 1 day led on
+		GPIO.output(GPIO_LED_3, 0)      # today led off
+		GPIO.output(GPIO_LED_TOWER_GREEN, 0)		# status ok
+		GPIO.output(GPIO_LED_TOWER_RED, 0)
+		GPIO.output(GPIO_LED_TOWER_YELLOW, 0)
 		while True:
 			# check a input
-			sw1 = GPIO.input(GPIO_SW_1) 
-			sw2 = GPIO.input(GPIO_SW_2) 
+			sw1 = GPIO.input(GPIO_SW_1)
+			sw2 = GPIO.input(GPIO_SW_2)
 			sw3 = GPIO.input(GPIO_SW_3)
-	
-			if sw1 == 1:
+			swBlue = GPIO.input(GPIO_SW_BLUE)
+			if sw1 == 0:
 				if iC0 == 0:
 					iC0 = GPIO_SW_1
 					GPIO.output(GPIO_LED_1, 1)		# 1 week led on
 					GPIO.output(GPIO_LED_2, 0)		# 1 day led off
 					GPIO.output(GPIO_LED_3, 0)		# today led off
+					GPIO.output(GPIO_LED_TOWER_GREEN, 1)
+					GPIO.output(GPIO_LED_TOWER_YELLOW, 0)
+					GPIO.output(GPIO_LED_TOWER_RED, 0)
 					eventBeforeDays(7, 'onepoint/1.wav')
 					iC0 = 0
-			elif sw2 == 1:
+			elif sw2 == 0:
 				if iC0 == 0:
 					iC0 = GPIO_SW_2
 					GPIO.output(GPIO_LED_1, 0)		# 1 week led off
 					GPIO.output(GPIO_LED_2, 1)		# 1 day led on
 					GPIO.output(GPIO_LED_3, 0)		# today led off
+					GPIO.output(GPIO_LED_TOWER_GREEN, 0)
+					GPIO.output(GPIO_LED_TOWER_YELLOW, 1)
+					GPIO.output(GPIO_LED_TOWER_RED, 0)
+
 					eventBeforeDays(1, 'onepoint/2.wav')
 					iC0 = 0
-			elif sw3 == 1:
+			elif sw3 == 0:
 				if iC0 == 0:
-					startMP3('music/01.wav')
-					iC0 = GPIO_SW_3
-					GPIO.output(GPIO_LED_1, 0)		# 1 week led off
-					GPIO.output(GPIO_LED_2, 0)		# 1 day led off
-					GPIO.output(GPIO_LED_3, 1)		# today led on
-					eventBeforeDays(0, 'onepoint/3.wav')
+					data = getIndexByFuture(0)
+					if len(data) > 0:
+						startMP3('music/01.wav')
+						iC0 = GPIO_SW_3
+						GPIO.output(GPIO_LED_1, 0)		# 1 week led off
+						GPIO.output(GPIO_LED_2, 0)		# 1 day led off
+						GPIO.output(GPIO_LED_3, 1)		# today led on
+						GPIO.output(GPIO_LED_TOWER_GREEN, 0)
+						GPIO.output(GPIO_LED_TOWER_YELLOW, 0)
+						GPIO.output(GPIO_LED_TOWER_RED, 1)
+
+						eventBeforeDays(0, 'onepoint/3.wav')
+						iC0 = 0
+			elif swBlue == 0:
+				if iC0 == 0:
+					iC0 = GPIO_SW_BLUE
+					startTalkProcess()
 					iC0 = 0
-				
+
 			time.sleep(0.01)
 			count = count + 1
 			if count % 50 == 0:
-				print iC0
+#				print iC0
 				count = 0
-			else:
-				print iC0,
-		#		print (iC0)
-	
+#			else:
+#				print iC0,
+				print (iC0)
+
 		GPIO.output(GPIO_LED_TOWER_GREEN, 0)		# status off
 		GPIO.output(GPIO_LED_1, 0)					# 1 week led off
 		GPIO.output(GPIO_LED_2, 0)					# 1 day led off
