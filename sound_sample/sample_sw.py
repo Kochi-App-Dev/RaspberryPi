@@ -51,7 +51,7 @@ def startSayProcess(say):
 	
 
 def startTalkProcess():
-    cmd = "python3 /home/pi/nakayama/aquestalkpi/zatudann.py"
+    cmd = "./p3.py"
     #proc = Popen( cmd,shell=True )
     proc = subprocess.call(cmd, shell=True )
     #print( "process id = %s" % proc.pid )
