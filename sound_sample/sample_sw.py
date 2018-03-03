@@ -6,6 +6,8 @@ from subprocess import Popen
 import datetime
 import argparse
 import subprocess
+import os
+import sys
 
 ####### 定数 #######
 GPIO_SW_1 = 6
@@ -20,6 +22,31 @@ GPIO_LED_3 = 7
 GPIO_LED_TOWER_RED = 16
 GPIO_LED_TOWER_YELLOW = 20
 GPIO_LED_TOWER_GREEN = 21
+
+####### 処理メイン #######
+iC0 = 0											# now process
+count = 0
+parser = argparse.ArgumentParser(description="Receive stock codes, a start date, and an end date")
+parser.add_argument("-g",
+					"--gpio",
+					nargs="?",
+					type=str,
+					default="",
+					help=u"GPIOを使用する場合は-gを付けて起動",
+					dest="use_gpio"
+					)
+
+parser.add_argument("-s",
+					"--sample",
+					nargs="?",
+					type=str,
+					default="",
+					help=u"テスト再生する場合は-sを付けて起動",
+					dest="use_sample"
+					)
+useGPIO = parser.parse_args().use_gpio
+useSample = parser.parse_args().use_sample
+
 
 
 ####### イベントデータ #######
@@ -45,17 +72,22 @@ def eventBeforeDays(days, sound):
 	
 def startSayProcess(say):
 	cmd = "./say " + say
+#	cmd = "./nakayama/aquestalkpi/word.txt"
 	#proc = Popen( cmd,shell=True )
 	proc = subprocess.call(cmd, shell=True )
 	#print( "process id = %s" % proc.pid )
 	
 
 def startTalkProcess():
-    cmd = "./p3.py"
+    cmd = "./p3.sh"
     #proc = Popen( cmd,shell=True )
     proc = subprocess.call(cmd, shell=True )
     #print( "process id = %s" % proc.pid )
-    
+    file = './nakayama/aquestalkpi/word.txt'
+    if os.path.isfile(file):
+        checkEvent()
+    else:
+    	print('no word data')
 
 
 def startMP3(file):
@@ -85,40 +117,69 @@ def getIndexByFuture(days):
 		
 	return []
 
-####### 処理メイン #######
-iC0 = 0											# now process
-count = 0
-parser = argparse.ArgumentParser(description="Receive stock codes, a start date, and an end date")
-parser.add_argument("-g",
-					"--gpio",
-					nargs="?",
-					type=str,
-					default="",
-					help=u"GPIOを使用する場合は-gを付けて起動",
-					dest="use_gpio"
-					)
+def checkEvent():
+    eventT = getIndexByFuture(0)
+    if (len(eventT) <= 0):
+        event1 = getIndexByFuture(1)
+        if (len(event1) <= 0):
+            event7 = getIndexByFuture(7)
+            if (len(event7) <= 0):
+            	print('no events')
+            else:
+	        	startEvent1Week()
+        else:
+			startEvent1Day()
+    else:
+		startEventToday()
 
-parser.add_argument("-s",
-					"--sample",
-					nargs="?",
-					type=str,
-					default="",
-					help=u"テスト再生する場合は-sを付けて起動",
-					dest="use_sample"
-					)
-useGPIO = parser.parse_args().use_gpio
-useSample = parser.parse_args().use_sample
+def startEvent1Week():
+	if useGPIO == "on":
+		iC0 = GPIO_SW_1
+		GPIO.output(GPIO_LED_1, 1)      # 1 week led on
+		GPIO.output(GPIO_LED_2, 0)      # 1 day led off
+		GPIO.output(GPIO_LED_3, 0)      # today led off
+		GPIO.output(GPIO_LED_TOWER_GREEN, 1)
+		GPIO.output(GPIO_LED_TOWER_YELLOW, 0)
+		GPIO.output(GPIO_LED_TOWER_RED, 0)
+	eventBeforeDays(7, 'onepoint/1.wav')
+	iC0 = 0
+
+def startEvent1Day():
+	if useGPIO == "on":
+		iC0 = GPIO_SW_2
+		GPIO.output(GPIO_LED_1, 0)		# 1 week led off
+		GPIO.output(GPIO_LED_2, 1)		# 1 day led on
+		GPIO.output(GPIO_LED_3, 0)		# today led off
+		GPIO.output(GPIO_LED_TOWER_GREEN, 0)
+		GPIO.output(GPIO_LED_TOWER_YELLOW, 1)
+		GPIO.output(GPIO_LED_TOWER_RED, 0)
+	eventBeforeDays(1, 'onepoint/2.wav')
+	iC0 = 0
+
+def startEventToday():
+	if useGPIO == "on":
+		iC0 = GPIO_SW_3
+		GPIO.output(GPIO_LED_1, 0)		# 1 week led off
+		GPIO.output(GPIO_LED_2, 0)		# 1 day led off
+		GPIO.output(GPIO_LED_3, 1)		# today led on
+		GPIO.output(GPIO_LED_TOWER_GREEN, 0)
+		GPIO.output(GPIO_LED_TOWER_YELLOW, 0)
+		GPIO.output(GPIO_LED_TOWER_RED, 1)
+	startMP3('music/01.wav')
+	eventBeforeDays(0, 'onepoint/3.wav')
+	iC0 = 0
 
 
 readEventData()
 
-
 if useSample == "on":
-	startMP3('music/01.wav')
-	iC0 = GPIO_SW_3
-	eventBeforeDays(-1, 'onepoint/3.wav')
-	time.sleep(5.01)
-
+#	startMP3('music/01.wav')
+#	iC0 = GPIO_SW_3
+#	eventBeforeDays(-1, 'onepoint/3.wav')
+#	time.sleep(5.01)
+	startTalkProcess()
+	time.sleep(20)
+	sys.exit()
 try:
 	if useGPIO == "on":
 		print "starting GPIO"
@@ -207,11 +268,12 @@ try:
 		GPIO.cleanup() # <- 消灯
 	else:
 		print "starting check"
-		eventT = eventBeforeDays(7, 'onepoint/3.wav')
-		if (eventT == 0):
-			event1 = eventBeforeDays(1, 'onepoint/2.wav')
-			if (event1 == 0):
-				event7 = eventBeforeDays(7, 'onepoint/1.wav')
+        checkEvent()
+#		eventT = eventBeforeDays(7, 'onepoint/3.wav')
+#		if (eventT == 0):
+#			event1 = eventBeforeDays(1, 'onepoint/2.wav')
+#			if (event1 == 0):
+#				event7 = eventBeforeDays(7, 'onepoint/1.wav')
 		
 except KeyboardInterrupt:
 	pass
